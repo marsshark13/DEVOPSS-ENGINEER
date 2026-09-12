@@ -97,7 +97,10 @@ Reader tests use the Python standard library. Full tests require requirements-de
 ## Next backend milestones
 
 1. Agree on this snapshot contract with the agent and frontend teammates.
-2. Add an analysis service once the agent engineer supplies the analyzer.
+2. `POST /api/repositories/analyze` and the analyzer boundary now exist
+   (`backend/analysis_service.py`); it returns `501 ANALYZER_NOT_CONFIGURED` until
+   the agent engineer injects an analyzer. See `backend/INTEGRATION.md` for the
+   proposed contract and the points needing teammate agreement.
 3. Add run IDs/status storage when asynchronous analysis and sandbox work are connected.
 4. Add user-authorized PR creation only after patch verification, with stale-commit detection.
 
