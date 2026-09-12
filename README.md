@@ -1,5 +1,7 @@
 # AI DevOps Engineer
 
+> **Team update:** The active stack is Python FastAPI + Streamlit. Start with [backend/README.md](backend/README.md) for the repository inspection API and Streamlit integration example. The Next.js sections below describe the original starter and are retained for reference.
+
 A Nebius × NVIDIA Global AI Hackathon project that helps developers understand and repair failed builds. Paste a GitHub repository URL, receive evidence-backed findings, review a proposed patch, verify it in an isolated sandbox, and open a pull request.
 
 **Status: runnable Next.js starter.** The landing page and `/api/health` work without credentials. Live repository analysis, NVIDIA inference, fix generation, sandbox execution, and PR creation are not implemented yet. Adapter interfaces and workstream notes define where they belong.
