@@ -4,7 +4,7 @@ export type NebiusChatRole = "system" | "user" | "assistant";
 
 export interface NebiusChatMessage {
   role: NebiusChatRole;
-  content: string;
+  content: string | { type: "text"; text: string }[];
 }
 
 export interface NebiusChatOptions {
@@ -67,22 +67,29 @@ export class NebiusInferenceClient {
     }
 
     try {
-      const response = await fetch(`${this.config.baseURL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.config.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: options.messages,
-          max_tokens: options.maxTokens ?? 800,
-          temperature: options.temperature ?? 0.2,
-        }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${this.config.baseURL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: this.config.model,
+            messages: options.messages,
+            max_tokens: options.maxTokens ?? 800,
+            temperature: options.temperature ?? 0.2,
+          }),
+          signal: controller.signal,
+        });
+      } catch (cause) {
+        if (controller.signal.aborted) throw new Error("Nebius inference request timed out.");
+        throw new Error("Nebius inference request could not be completed.", { cause });
+      }
 
-      const body = await readJson(response);
+      const rawBody = await response.text();
+      const body = parseJson(rawBody);
       if (!response.ok) {
         throw new Error(`Nebius inference failed with ${response.status}: ${readErrorMessage(body)}`);
       }
@@ -109,8 +116,7 @@ function readTimeoutMs(value: string | undefined): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  const text = await response.text();
+function parseJson(text: string): unknown {
   if (!text) return null;
   try {
     return JSON.parse(text) as unknown;
@@ -131,16 +137,34 @@ function parseChatCompletion(body: unknown, fallbackModel: string): NebiusChatRe
   if (!isRecord(firstChoice)) throw new Error("Nebius inference returned an invalid choice.");
 
   const message = firstChoice.message;
-  if (!isRecord(message) || typeof message.content !== "string") {
+  if (!isRecord(message)) {
     throw new Error("Nebius inference returned a choice without text content.");
   }
+  const content = readMessageContent(message.content) ?? readMessageContent(firstChoice.text);
+  if (content === null) throw new Error("Nebius inference returned an unsupported message content format.");
 
   return {
-    content: message.content,
+    content,
     model: typeof response.model === "string" ? response.model : fallbackModel,
     finishReason: typeof firstChoice.finish_reason === "string" ? firstChoice.finish_reason : null,
     usage: parseUsage(response.usage),
   };
+}
+
+function readMessageContent(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (isRecord(value) && value.type === "text" && typeof value.text === "string") return value.text;
+  if (!Array.isArray(value)) return null;
+
+  const parts: string[] = [];
+  for (const part of value) {
+    if (typeof part === "string") {
+      parts.push(part);
+    } else if (isRecord(part) && part.type === "text" && typeof part.text === "string") {
+      parts.push(part.text);
+    }
+  }
+  return parts.length > 0 ? parts.join("") : null;
 }
 
 function parseUsage(value: unknown): NebiusUsage | undefined {
