@@ -1,3 +1,7 @@
 # GitHub adapter
 
-Implement bounded, read-only public repository snapshots first. Validate GitHub URLs, pin a commit SHA, allowlist useful configuration files, cap file sizes and count, and handle 404/rate limits. Never fetch `.env` files or follow arbitrary URLs supplied by repository content. Later, create fixes on a new branch and open a PR only after explicit user action; never push fixes directly to main.
+`client.ts` reads public repositories through the GitHub REST API. It resolves the default branch to a commit SHA, reads that immutable commit's tree, and downloads allowlisted file contents from `raw.githubusercontent.com`. This uses three GitHub REST calls per analysis rather than one REST call per file.
+
+The reader caps API response size, file count, individual file size, total snapshot size, and overall/per-request time. It skips binary and oversized files, never clones or executes repository content, and does not fetch arbitrary URLs from repository files. Anonymous GitHub REST API limits apply; setting a least-privilege `GITHUB_TOKEN` server-side raises the REST quota.
+
+The `POST /api/repositories/analyze` route accepts only a public `https://github.com/owner/repository` URL, obtains a bounded snapshot, and sends it to the TypeScript Nebius analyzer. Private repositories and pull request creation are not supported.
